@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(0, 0, 0, 0.87); /* Changed to black for light mode default */
+  background-color: #ffffff; /* Changed to white for light mode default */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: flex-start; /* Changed from center to allow normal layout */
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+#app {
+  /* Removed restrictive max-width and center alignment that breaks full-layout apps */
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
