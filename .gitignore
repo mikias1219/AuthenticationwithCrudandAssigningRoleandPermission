@@ -1,0 +1,58 @@
+# OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Frontend
+frontend/frontend/node_modules/
+frontend/frontend/dist/
+frontend/frontend/.vite/
+frontend/frontend/.cache/
+
+# Backend
+backend/backend/vendor/
+backend/backend/.env
+backend/backend/storage/logs/*
+backend/backend/storage/framework/cache/*
+backend/backend/storage/framework/sessions/*
+backend/backend/storage/framework/views/*
+backend/backend/bootstrap/cache/*
+!backend/backend/storage/logs/.gitignore
+!backend/backend/storage/framework/cache/.gitignore
+!backend/backend/storage/framework/sessions/.gitignore
+!backend/backend/storage/framework/views/.gitignore
+backend/backend/database/database.sqlite
+backend/backend/database/*.sqlite
+backend/backend/database/*.sqlite-journal
+
+# Composer
+backend/backend/composer.phar
+
+# PHP
+backend/backend/.phpunit.result.cache
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+

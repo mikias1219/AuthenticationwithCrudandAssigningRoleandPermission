@@ -42,6 +42,7 @@
           </button>
         </div>
         <button 
+          v-if="hasPermission('create_users')"
           @click="openAddModal"
           class="bg-[#dc2626] hover:bg-[#b91c1c] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors w-full md:w-auto justify-center"
         >
@@ -80,10 +81,20 @@
               </td>
               <td class="p-4 text-right">
                 <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <button @click="editUser(user)" class="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
+                   <button 
+                    v-if="hasPermission('edit_users')"
+                    @click="editUser(user)" 
+                    class="p-1 text-gray-400 hover:text-blue-600 transition-colors" 
+                    title="Edit"
+                  >
                     <Edit2 class="w-4 h-4" />
                   </button>
-                  <button @click="deleteUser(user.id)" class="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+                  <button 
+                    v-if="hasPermission('delete_users')"
+                    @click="deleteUser(user.id)" 
+                    class="p-1 text-gray-400 hover:text-red-600 transition-colors" 
+                    title="Delete"
+                  >
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
@@ -175,7 +186,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import axios from "axios";
+import { api as axiosInstance } from "@/api/api";
 import { 
   Search, 
   Plus, 
@@ -188,6 +199,13 @@ import {
   X,
   Loader2
 } from 'lucide-vue-next';
+import { hasPermission, refreshUserPermissions } from '@/utils/permissions';
+
+// Refresh user permissions after user role is updated
+async function refreshPermissionsAfterUserUpdate() {
+  await refreshUserPermissions(api);
+  window.dispatchEvent(new CustomEvent('permissions-updated'));
+}
 
 const users = ref([]);
 const roles = ref([]);
@@ -222,14 +240,6 @@ const filteredUsers = computed(() => {
     u.email.toLowerCase().includes(q) ||
     (u.role?.name || '').toLowerCase().includes(q)
   );
-});
-
-// Axios instance
-const axiosInstance = axios.create({
-  baseURL: "http://localhost:8000/api",
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  },
 });
 
 // Fetch users and roles
@@ -315,8 +325,16 @@ async function saveUser() {
       userData.password = form.value.password;
     }
     
+    let updatedUser = null;
     if (editing.value) {
-      await axiosInstance.put(`/users/${form.value.id}`, userData);
+      const response = await axiosInstance.put(`/users/${form.value.id}`, userData);
+      updatedUser = response.data;
+      
+      // If current user's role was changed, refresh their permissions
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      if (currentUser.id === form.value.id && currentUser.role_id !== form.value.role_id) {
+        await refreshPermissionsAfterUserUpdate();
+      }
     } else {
       await axiosInstance.post(`/users`, userData);
     }

@@ -23,7 +23,8 @@ const routes = [
     component: Dashboard,
     meta: { 
       title: "Dashboard",
-      requiresAuth: true 
+      requiresAuth: true,
+      permission: "view_dashboard" // Optional - if user doesn't have this, they'll be redirected to account
     }
   },
   { 
@@ -33,7 +34,7 @@ const routes = [
     meta: { 
       title: "Users",
       requiresAuth: true,
-      permission: "manage_users"
+      permission: "view_users"
     }
   },
   { 
@@ -43,7 +44,7 @@ const routes = [
     meta: { 
       title: "Roles",
       requiresAuth: true,
-      permission: "manage_users"
+      permission: "view_roles"
     }
   },
   { 
@@ -53,7 +54,7 @@ const routes = [
     meta: { 
       title: "Permissions",
       requiresAuth: true,
-      permission: "manage_users"
+      permission: "view_permissions"
     }
   },
   { 
@@ -76,34 +77,12 @@ const router = createRouter({
   routes,
 });
 
-// Helper function to log navigation details
-function logNavigationDetails(to, from, token) {
-  console.log(`\n=== ROUTER DEBUG ===`);
-  console.log(`Navigation: ${from.path || '/'} -> ${to.path}`);
-  console.log(`From:`, from);
-  console.log(`To:`, to);
-  console.log(`Token exists: ${!!token}`);
-  console.log(`Token value: ${token ? `${token.substring(0, 20)}...` : 'null'}`);
-  console.log(`Route name: ${to.name}`);
-  console.log(`Route meta:`, to.meta);
-  console.log(`Requires auth: ${to.meta.requiresAuth}`);
-  console.log(`Is public: ${to.meta.public}`);
-  console.log(`===================\n`);
-}
 
-// Check if components are properly imported
-console.log('=== ROUTER INITIALIZATION ===');
-console.log('Dashboard component:', Dashboard);
-console.log('Login component:', Login);
-console.log('Users component:', Users);
-console.log('All routes:', routes);
+import { hasPermission } from '@/utils/permissions';
 
-// Navigation guard with enhanced debugging
+// Navigation guard
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token');
-  
-  // Log detailed navigation info
-  logNavigationDetails(to, from, token);
   
   // Set page title
   if (to.meta.title) {
@@ -112,101 +91,42 @@ router.beforeEach((to, from, next) => {
   
   // Check if going to login with existing token
   if (to.path === '/login' && token) {
-    console.log('🔵 Already logged in, redirecting to dashboard');
-    console.log('Token found:', token.substring(0, 20) + '...');
     next('/');
     return;
   }
   
   // Check if trying to access protected route without token
   if (to.meta.requiresAuth && !token) {
-    console.log('🔴 No token, redirecting to login');
-    console.log('Route requires auth but no token found');
     next('/login');
     return;
   }
   
-  // Check if component exists for the route
+  // Check permission if route requires specific permission
+  if (to.meta.permission && token) {
+    if (!hasPermission(to.meta.permission)) {
+      // Log the permission issue (for debugging)
+      console.warn(`Access denied: User does not have permission '${to.meta.permission}' for route '${to.path}'`);
+      
+      // Redirect to a safe page
+      // Try dashboard first, then account (which all authenticated users can access)
+      if (hasPermission('view_dashboard')) {
+        next('/');
+      } else {
+        // If no dashboard permission, go to account page
+        next('/account');
+      }
+      return;
+    }
+  }
+  
+  // Check if component exists
   if (!to.matched.length) {
-    console.log('⚠️ No route matched, redirecting to login');
     next('/login');
     return;
   }
   
-  // Check if component is loaded
-  const component = to.matched[0]?.components?.default;
-  if (!component) {
-    console.log('⚠️ Component not found for route:', to.path);
-    console.log('Attempting to load component...');
-    
-    // Try dynamic import as fallback
-    const componentName = to.name || 'dashboard';
-    import(`@/components/pages/${componentName.charAt(0).toUpperCase() + componentName.slice(1)}.vue`)
-      .then(module => {
-        console.log('✅ Component loaded dynamically:', module.default);
-        to.matched[0].components.default = module.default;
-        next();
-      })
-      .catch(error => {
-        console.error('❌ Failed to load component:', error);
-        next('/login');
-      });
-    return;
-  }
-  
-  console.log('✅ Navigation allowed to:', to.path);
-  console.log('Component:', component);
   next();
 });
 
-// Add afterEach hook for debugging
-router.afterEach((to, from, failure) => {
-  console.log(`\n=== AFTER NAVIGATION ===`);
-  console.log(`Completed: ${from.path || '/'} -> ${to.path}`);
-  console.log(`Navigation ${failure ? 'failed' : 'succeeded'}`);
-  if (failure) {
-    console.error('Navigation error:', failure);
-  }
-  console.log(`Current route:`, router.currentRoute.value);
-  console.log(`========================\n`);
-});
-
-// Error handler for navigation failures
-router.onError((error, to, from) => {
-  console.error('💥 Router Error:', error);
-  console.error('From:', from);
-  console.error('To:', to);
-  
-  // Check if it's a chunk loading error
-  if (error && error.message && error.message.includes('Failed to fetch dynamically imported module')) {
-    console.error('Chunk loading failed, likely component file missing');
-    alert('Page failed to load. Please refresh or check if component exists.');
-  }
-});
-
-// Export router with additional debugging
-router.debug = {
-  printRoutes: () => {
-    console.log('Available routes:');
-    router.getRoutes().forEach(route => {
-      console.log(`- ${route.path} (${route.name}) -> ${route.components?.default?.name || 'No component'}`);
-    });
-  },
-  
-  checkComponent: (routeName) => {
-    const route = router.getRoutes().find(r => r.name === routeName);
-    if (route) {
-      console.log(`Checking ${routeName}:`, route);
-      console.log('Component:', route.components?.default);
-    } else {
-      console.log(`Route ${routeName} not found`);
-    }
-  }
-};
-
-// Log router initialization
-console.log('Router created:', router);
-console.log('Router mode:', router.mode);
-console.log('Base URL:', router.options.history.base);
 
 export default router;

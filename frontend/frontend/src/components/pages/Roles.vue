@@ -38,6 +38,7 @@
           </div>
         </div>
         <button 
+          v-if="hasPermission('create_roles')"
           @click="openCreateModal"
           class="bg-[#dc2626] hover:bg-[#b91c1c] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors w-full md:w-auto justify-center"
         >
@@ -82,10 +83,20 @@
               </td>
               <td class="p-4 text-right">
                 <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <button @click="editRole(role)" class="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit Permissions">
+                   <button 
+                    v-if="hasPermission('edit_roles') || hasPermission('assign_permissions')"
+                    @click="editRole(role)" 
+                    class="p-1 text-gray-400 hover:text-blue-600 transition-colors" 
+                    title="Edit Permissions"
+                  >
                     <Edit2 class="w-4 h-4" />
                   </button>
-                  <button @click="deleteRole(role.id)" class="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+                  <button 
+                    v-if="hasPermission('delete_roles')"
+                    @click="deleteRole(role.id)" 
+                    class="p-1 text-gray-400 hover:text-red-600 transition-colors" 
+                    title="Delete"
+                  >
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
@@ -126,7 +137,7 @@
             </div>
 
             <!-- Permissions Checklist -->
-            <div>
+            <div v-if="hasPermission('assign_permissions')">
               <label class="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
               <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                  <div v-if="allPermissions.length === 0" class="text-sm text-gray-500 text-center py-4">No permissions found in system.</div>
@@ -138,6 +149,9 @@
                  </div>
               </div>
               <p class="text-xs text-gray-500 mt-2">Select the permissions this role includes.</p>
+            </div>
+            <div v-else class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p class="text-sm text-yellow-800">You don't have permission to assign permissions to roles.</p>
             </div>
         </div>
 
@@ -157,7 +171,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import axios from "axios";
+import { api } from "@/api/api";
 import { 
   Search, 
   Plus, 
@@ -168,6 +182,18 @@ import {
   Users,
   ShieldCheck
 } from 'lucide-vue-next';
+import { hasPermission, refreshUserPermissions, getCurrentUser } from '@/utils/permissions';
+
+// Refresh current user permissions if their role was modified
+async function refreshCurrentUserIfNeeded(modifiedRoleId) {
+  const currentUser = getCurrentUser();
+  if (currentUser && currentUser.role_id === modifiedRoleId) {
+    // Current user's role was modified, refresh their permissions
+    await refreshUserPermissions(api);
+    // Trigger a custom event to notify other components
+    window.dispatchEvent(new CustomEvent('permissions-updated'));
+  }
+}
 
 // State
 const roles = ref([]);
@@ -189,20 +215,6 @@ const filteredRoles = computed(() => {
   if (!searchQuery.value) return roles.value;
   const q = searchQuery.value.toLowerCase();
   return roles.value.filter(r => r.name.toLowerCase().includes(q));
-});
-
-// Axios
-const api = axios.create({
-  baseURL: "http://localhost:8000/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
 });
 
 // Actions
@@ -261,73 +273,40 @@ async function saveRole() {
   saving.value = true;
   try {
     if (editing.value) {
-      // Update logic: This might need adjustment based on your strict API
-      // Usually PUT /roles/:id for name, and sync permissions separately or together
-      // Assuming a backend that supports syncing permissions via an endpoint or included in update
-      
-      // 1. Update Name (Generic assumption)
-      // await api.put(`/roles/${form.value.id}`, { name: form.value.name });
-      
-      // 2. Sync Permissions. 
-      // The previous file used /role/permissions with POST/DELETE.
-      // Ideally, we have a bulk sync endpoint. If not, we iterate.
-      // Let's try a common pattern based on the previous file's logic which toggled one by one.
-      // BUT, for a clean save, we should ideally use a "sync" endpoint.
-      // If none exists, we might have to use the loop approach or a custom endpoint.
-      
-      // PROPOSAL: Try to send everything to a sync-like endpoint or use the loop if strictly needed.
-      // Given the previous code used `api.post('/role/permissions', ...)` or `delete`:
-      
-      /* 
-         Previous strategy was:
-         - togglePermission checks state and sends POST or DELETE.
-         
-         New strategy for "Save":
-         - compare form.permissions with original role permissions.
-         - find additions and removals.
-         - execute requests.
-      */
-     
+      // Update role name if changed
       const originalRole = roles.value.find(r => r.id === form.value.id);
-      const originalPermIds = originalRole.permissions ? originalRole.permissions.map(p => p.id || p) : [];
-      
-      const newPermIds = form.value.permissions; // IDs
-      
-      const toAdd = newPermIds.filter(id => !originalPermIds.includes(id));
-      const toRemove = originalPermIds.filter(id => !newPermIds.includes(id));
-      
-      // Execute removals
-      for (const pId of toRemove) {
-         await api.delete('/role/permissions', { data: { role_id: form.value.id, permissions: [pId] } });
-      }
-      
-      // Execute additions
-      for (const pId of toAdd) {
-         await api.post('/role/permissions', { role_id: form.value.id, permissions: [pId] });
-      }
-      
-      // Update Name check
       if (originalRole.name !== form.value.name) {
-          // Assuming there is a way to update name, usually PUT /roles/:id
-          // If not, we skip.
-           try { await api.put(`/roles/${form.value.id}`, { name: form.value.name }); } catch(e) { console.warn("Role update name failed or not supported", e); }
+        await api.put(`/roles/${form.value.id}`, { name: form.value.name });
       }
+      
+      // Sync all permissions at once using the sync endpoint
+      await api.put('/role/permissions', {
+        role_id: form.value.id,
+        permissions: form.value.permissions
+      });
+      
+      // Refresh current user permissions if they were affected
+      await refreshCurrentUserIfNeeded(form.value.id);
 
     } else {
-      // Create New
+      // Create new role
       const res = await api.post("/roles", { name: form.value.name });
-      const newRoleId = res.data.id || res.data.role?.id; // Adjust based on response
+      const newRoleId = res.data.id;
       
+      // Assign permissions to new role using sync
       if (newRoleId && form.value.permissions.length > 0) {
-         // Assign permissions to new role
-         for (const pId of form.value.permissions) {
-             await api.post('/role/permissions', { role_id: newRoleId, permissions: [pId] });
-         }
+        await api.put('/role/permissions', {
+          role_id: newRoleId,
+          permissions: form.value.permissions
+        });
       }
     }
     
     closeModal();
     await fetchData();
+    
+    // Show success message
+    alert(editing.value ? 'Role updated successfully!' : 'Role created successfully!');
     
   } catch (err) {
     console.error("Save failed:", err);

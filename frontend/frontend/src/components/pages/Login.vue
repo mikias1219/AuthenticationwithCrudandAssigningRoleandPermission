@@ -58,7 +58,7 @@
 
 <script>
 import axios from "axios";
-import bgImage from "@/assets/img.jpg"; // <-- YOUR IMAGE
+import bgImage from "@/assets/img.jpg";
 
 export default {
   name: "Login",
@@ -93,9 +93,17 @@ export default {
           password: this.form.password,
         });
 
+        // Store token and user data
         localStorage.setItem("token", response.data.token);
         if (response.data.user) {
-          localStorage.setItem("user", JSON.stringify(response.data.user));
+          // Ensure user data includes role and permissions
+          const userData = response.data.user;
+          if (userData.role && userData.role.permissions) {
+            localStorage.setItem("user", JSON.stringify(userData));
+          } else {
+            // If permissions not loaded, store as is (backend should include them)
+            localStorage.setItem("user", JSON.stringify(userData));
+          }
         }
 
         setTimeout(() => {

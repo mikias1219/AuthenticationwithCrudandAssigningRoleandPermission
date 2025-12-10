@@ -38,6 +38,7 @@
           </div>
         </div>
         <button 
+          v-if="hasPermission('create_permissions')"
           @click="openCreateModal"
           class="bg-[#dc2626] hover:bg-[#b91c1c] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors w-full md:w-auto justify-center"
         >
@@ -76,10 +77,20 @@
               <td class="p-4 text-gray-500">{{ formatDate(perm.created_at) }}</td>
               <td class="p-4 text-right">
                 <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <button @click="editPermission(perm)" class="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
+                   <button 
+                    v-if="hasPermission('edit_permissions')"
+                    @click="editPermission(perm)" 
+                    class="p-1 text-gray-400 hover:text-blue-600 transition-colors" 
+                    title="Edit"
+                  >
                     <Edit2 class="w-4 h-4" />
                   </button>
-                  <button @click="deletePermission(perm.id)" class="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Delete">
+                  <button 
+                    v-if="hasPermission('delete_permissions')"
+                    @click="deletePermission(perm.id)" 
+                    class="p-1 text-gray-400 hover:text-red-600 transition-colors" 
+                    title="Delete"
+                  >
                     <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
@@ -140,7 +151,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
-import axios from "axios";
+import { api } from "@/api/api";
 import { 
   Search, 
   Plus, 
@@ -150,6 +161,7 @@ import {
   Loader2,
   Lock
 } from 'lucide-vue-next';
+import { hasPermission } from '@/utils/permissions';
 
 // State
 const permissions = ref([]);
@@ -183,20 +195,6 @@ const recentCount = computed(() => {
   const now = new Date();
   const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1));
   return permissions.value.filter(p => new Date(p.created_at) > oneMonthAgo).length;
-});
-
-// Axios
-const api = axios.create({
-  baseURL: "http://localhost:8000/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
 });
 
 // Actions

@@ -93,7 +93,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import axios from "axios";
+import { api as axiosInstance } from "@/api/api";
 
 const router = useRouter();
 const loading = ref(true);
@@ -107,14 +107,6 @@ const form = ref({
   current_password: "",
   password: "",
   password_confirmation: ""
-});
-
-// Axios instance
-const axiosInstance = axios.create({
-  baseURL: "http://localhost:8000/api",
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  },
 });
 
 const userRole = computed(() => userData.value.role?.name || 'No role assigned');
@@ -164,7 +156,13 @@ async function saveAccount() {
       return;
     }
     const response = await axiosInstance.put("/account", dataToSend);
-    if (response.data.user) userData.value = response.data.user;
+    if (response.data.user) {
+      userData.value = response.data.user;
+      // Update localStorage with fresh user data
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Trigger permission refresh event
+      window.dispatchEvent(new CustomEvent('permissions-updated'));
+    }
     form.value.current_password = form.value.password = form.value.password_confirmation = "";
     alert(response.data.message || "Account updated successfully!");
     await fetchAccountData();

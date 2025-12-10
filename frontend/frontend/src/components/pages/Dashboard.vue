@@ -80,8 +80,8 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
 import { Calendar } from "lucide-vue-next";
-import axios from "axios";
 import { useRouter } from "vue-router";
+import { api } from "@/api/api";
 import {
   Chart as ChartJS,
   Title,
@@ -178,21 +178,6 @@ const chartOptions = {
   }
 };
 
-// API Handling
-const api = axios.create({
-  baseURL: "http://localhost:8000/api",
-  headers: {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  },
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
 async function loadData() {
   loading.value = true;
   error.value = null;
@@ -204,22 +189,31 @@ async function loadData() {
       return;
     }
 
+    // Try to fetch data, but handle permission errors gracefully
     const [usersRes, rolesRes, permsRes] = await Promise.all([
-      api.get("/users").catch(() => ({ data: [] })),
-      api.get("/roles").catch(() => ({ data: [] })),
-      api.get("/permissions").catch(() => ({ data: [] }))
+      api.get("/users").catch((err) => {
+        if (err.response?.status === 403) {
+          return { data: [] }; // No permission, return empty
+        }
+        return { data: [] };
+      }),
+      api.get("/roles").catch((err) => {
+        if (err.response?.status === 403) {
+          return { data: [] }; // No permission, return empty
+        }
+        return { data: [] };
+      }),
+      api.get("/permissions").catch((err) => {
+        if (err.response?.status === 403) {
+          return { data: [] }; // No permission, return empty
+        }
+        return { data: [] };
+      })
     ]);
 
     users.value = usersRes.data || [];
     roles.value = rolesRes.data || [];
     permissions.value = permsRes.data || [];
-    
-    // Debug log
-    console.log("Loaded data:", { 
-      users: users.value.length, 
-      roles: roles.value.length, 
-      permissions: permissions.value.length 
-    });
 
   } catch (err) {
     console.error("Error loading dashboard data:", err);
